@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Building2, Moon, Sun, LogOut, LogIn, LayoutDashboard, Megaphone, ShieldCheck, Target, TrendingUp } from 'lucide-react';
+import { Building2, Moon, Sun, LogOut, LogIn, LayoutDashboard, Megaphone, ShieldCheck, Target } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { Dashboard } from './pages/Dashboard';
 import { SellerProfile } from './pages/SellerProfile';

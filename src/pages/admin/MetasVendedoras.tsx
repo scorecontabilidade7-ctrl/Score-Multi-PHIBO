@@ -137,21 +137,6 @@ export const MetasVendedoras: React.FC = () => {
       </div>
     );
   }
-        <div>
-          <h2 className="text-base font-bold text-foreground">Acesso Não Autorizado</h2>
-          <p className="text-xs text-muted-foreground mt-1">
-            Seu perfil de vendedora não possui permissão para alterar metas ou configurações da loja.
-          </p>
-        </div>
-        <button
-          onClick={() => navigate(`/vendedor/${encodeURIComponent(profile?.nome_vendedor || 'Juliana')}`)}
-          className="w-full py-2.5 rounded-xl text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white shadow-xs transition-colors cursor-pointer"
-        >
-          Ir para Meu Perfil de Vendas
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 md:p-8 space-y-6 animate-fade-in">
