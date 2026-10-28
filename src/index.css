@@ -1,0 +1,183 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Fundo suave, moderno e confortável aos olhos (elimina o efeito branco ofuscante) */
+    --background: 218 20% 93%;
+    --foreground: 224 28% 12%;
+
+    /* Cards com acabamento limpo e elevação nítida sobre o fundo suave */
+    --card: 0 0% 100%;
+    --card-foreground: 224 28% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 28% 12%;
+
+    /* BlushFit Official Pink / Rose Accent (#c0577f -> HSL 337, 48%, 55%) */
+    --primary: 337 48% 55%;
+    --primary-foreground: 355 100% 98%;
+
+    --secondary: 218 16% 87%;
+    --secondary-foreground: 224 28% 14%;
+
+    --muted: 218 16% 88%;
+    --muted-foreground: 220 12% 40%;
+
+    --accent: 337 60% 95%;
+    --accent-foreground: 337 48% 38%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 218 14% 83%;
+    --input: 218 14% 83%;
+    --ring: 337 48% 55%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 7%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 337 48% 58%;
+    --primary-foreground: 355 100% 98%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 337 30% 18%;
+    --accent-foreground: 337 60% 80%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 337 48% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  /* Elevação e contraste visual refinado para os cards no modo claro */
+  .bg-card {
+    box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.03);
+  }
+  .dark .bg-card {
+    box-shadow: none;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.45);
+}
+
+/* Animações Premium do Pódio das Vendedoras */
+@keyframes podium-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes gold-sheen {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  30%, 100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+@keyframes crown-float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(3deg);
+  }
+}
+
+@keyframes gold-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.25), inset 0 0 8px rgba(245, 158, 11, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 28px rgba(245, 158, 11, 0.55), inset 0 0 18px rgba(245, 158, 11, 0.2);
+  }
+}
+
+@keyframes medal-shine {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.9));
+  }
+}
+
+.animate-podium-1 {
+  animation: podium-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+}
+
+.animate-podium-2 {
+  animation: podium-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+}
+
+.animate-podium-3 {
+  animation: podium-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+}
+
+.animate-crown-float {
+  animation: crown-float 2.8s ease-in-out infinite;
+}
+
+.animate-gold-glow {
+  animation: gold-glow 3.5s ease-in-out infinite;
+}
+
+.animate-gold-sheen {
+  animation: gold-sheen 4.5s ease-in-out infinite;
+}
+
+.animate-medal-shine {
+  animation: medal-shine 3s ease-in-out infinite;
+}
+
