@@ -22,7 +22,7 @@ import { AcompanhamentoSemanalMetas } from '../../components/metas/Acompanhament
 
 export const MetasVendedoras: React.FC = () => {
   const navigate = useNavigate();
-  const { profile, isAuthenticated } = useAuth();
+  const { profile, isAuthenticated, loading } = useAuth();
   const isSeller = profile?.role === 'seller';
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,7 +72,6 @@ export const MetasVendedoras: React.FC = () => {
     }
   };
 
-
   const handleCriarVendedor = (e: React.FormEvent) => {
     e.preventDefault();
     if (!novoVendedorNome) return;
@@ -83,7 +82,40 @@ export const MetasVendedoras: React.FC = () => {
     setTimeout(() => setSuccessMessage(''), 3000);
   };
 
-  // 1. Se não estiver autenticado, exige login
+  // 1. Estado de carregamento
+  if (loading) {
+    return (
+      <div className="h-64 flex items-center justify-center text-sm text-muted-foreground animate-fade-in">
+        <Loader2 className="w-5 h-5 animate-spin mr-2 text-rose-500" />
+        Carregando permissões de acesso...
+      </div>
+    );
+  }
+
+  // 2. Se for vendedora (seller), bloqueia o acesso
+  if (isSeller) {
+    return (
+      <div className="max-w-md mx-auto my-12 p-6 rounded-2xl border border-border bg-card shadow-lg text-center space-y-4 animate-fade-in">
+        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
+          <ShieldAlert className="w-6 h-6" />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-foreground">Acesso Não Autorizado</h2>
+          <p className="text-xs text-muted-foreground mt-1">
+            Seu perfil de vendedora não possui permissão para alterar metas ou configurações da loja.
+          </p>
+        </div>
+        <button
+          onClick={() => navigate(`/vendedor/${encodeURIComponent(profile?.nome_vendedor || 'Juliana')}`)}
+          className="w-full py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-colors cursor-pointer"
+        >
+          Voltar ao Meu Painel de Vendas
+        </button>
+      </div>
+    );
+  }
+
+  // 3. Se não estiver autenticado, exige login corporativo
   if (!isAuthenticated) {
     return (
       <div className="max-w-md mx-auto my-12 p-6 rounded-2xl border border-border bg-card shadow-lg text-center space-y-4 animate-fade-in">
@@ -105,14 +137,6 @@ export const MetasVendedoras: React.FC = () => {
       </div>
     );
   }
-
-  // 2. Se for vendedora (seller), bloqueia o acesso
-  if (isSeller) {
-    return (
-      <div className="max-w-md mx-auto my-12 p-6 rounded-2xl border border-border bg-card shadow-lg text-center space-y-4 animate-fade-in">
-        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto">
-          <ShieldAlert className="w-6 h-6" />
-        </div>
         <div>
           <h2 className="text-base font-bold text-foreground">Acesso Não Autorizado</h2>
           <p className="text-xs text-muted-foreground mt-1">

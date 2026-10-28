@@ -72,77 +72,61 @@ export default function App() {
                     <BlushFitLogo height={32} showTag={true} />
                   </div>
 
-                  {/* Abas de Navegação Principal com Governança RBAC */}
-                  <nav className="hidden md:flex items-center gap-1.5 pl-4 border-l border-border">
-                    {profile?.role === 'seller' ? (
-                      /* Nível Vendedora: Acesso estritamente restrito à sua tela individual de vendas */
+                  {/* Abas de Navegação Principal: Visível apenas para Gestão (Gerentes / Gestores / Diretoria) */}
+                  {profile?.role !== 'seller' && (
+                    <nav className="hidden md:flex items-center gap-1.5 pl-4 border-l border-border">
                       <button
-                        onClick={() => navigate(`/vendedor/${encodeURIComponent(profile?.nome_vendedor || 'Juliana')}`)}
+                        onClick={() => navigate('/')}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          location.pathname.startsWith('/vendedor')
+                          location.pathname === '/'
                             ? 'bg-rose-500 text-white shadow-xs'
                             : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                         }`}
                       >
-                        <TrendingUp className="w-3.5 h-3.5" />
-                        <span>Minhas Vendas</span>
+                        <LayoutDashboard className="w-3.5 h-3.5" />
+                        <span>Dashboard</span>
                       </button>
-                    ) : (
-                      /* Nível Gerencial e Administrativo (Gerentes / Gestores / Diretoria) */
-                      <>
+
+                      <button
+                        onClick={() => navigate('/campanhas')}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          location.pathname === '/campanhas'
+                            ? 'bg-rose-500 text-white shadow-xs'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                        }`}
+                      >
+                        <Megaphone className="w-3.5 h-3.5" />
+                        <span>Campanhas</span>
+                      </button>
+
+                      <button
+                        onClick={() => navigate('/metas')}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          location.pathname === '/metas' || location.pathname === '/admin'
+                            ? 'bg-rose-500 text-white shadow-xs'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                        }`}
+                      >
+                        <Target className="w-3.5 h-3.5" />
+                        <span>Vendedoras & Metas</span>
+                      </button>
+
+                      {/* Governança: Exclusivo Super Admin (Cadastrar Lojas PHIBO no SaaS) */}
+                      {profile?.role === 'super_admin' && (
                         <button
-                          onClick={() => navigate('/')}
+                          onClick={() => navigate('/governanca')}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            location.pathname === '/'
+                            location.pathname === '/governanca'
                               ? 'bg-rose-500 text-white shadow-xs'
                               : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
                           }`}
                         >
-                          <LayoutDashboard className="w-3.5 h-3.5" />
-                          <span>Dashboard</span>
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>Governança</span>
                         </button>
-
-                        <button
-                          onClick={() => navigate('/campanhas')}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            location.pathname === '/campanhas'
-                              ? 'bg-rose-500 text-white shadow-xs'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                          }`}
-                        >
-                          <Megaphone className="w-3.5 h-3.5" />
-                          <span>Campanhas</span>
-                        </button>
-
-                        <button
-                          onClick={() => navigate(isAuthenticated ? '/metas' : '/login')}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            location.pathname === '/metas' || location.pathname === '/admin'
-                              ? 'bg-rose-500 text-white shadow-xs'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                          }`}
-                        >
-                          <Target className="w-3.5 h-3.5" />
-                          <span>Vendedoras & Metas</span>
-                        </button>
-
-                        {/* Governança: Exclusivo Super Admin (Cadastrar Lojas PHIBO no SaaS) */}
-                        {profile?.role === 'super_admin' && (
-                          <button
-                            onClick={() => navigate('/governanca')}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                              location.pathname === '/governanca'
-                                ? 'bg-rose-500 text-white shadow-xs'
-                                : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                            }`}
-                          >
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>Governança</span>
-                          </button>
-                        )}
-                      </>
-                    )}
-                  </nav>
+                      )}
+                    </nav>
+                  )}
                 </div>
 
                 {/* Controles de Loja, Tema e Perfil */}
