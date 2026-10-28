@@ -122,3 +122,4 @@ O build compila o TypeScript (`tsc -b`) e gera os arquivos estáticos otimizados
 
 Desenvolvido para **Score Contabilidade & Inteligência Comercial**.  
 Todos os direitos reservados.
+
