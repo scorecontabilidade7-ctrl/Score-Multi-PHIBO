@@ -7,7 +7,7 @@ export interface AuthContextType {
   profile: PhiboPerfil | null;
   loading: boolean;
   isAuthenticated: boolean;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; profile?: PhiboPerfil | null; error?: string }>;
   loginDemo: (role: UserRole, name: string, email: string, nomeVendedor?: string) => void;
   signOut: () => Promise<void>;
 }
@@ -46,14 +46,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('phibo_perfis')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (!error && data) {
         setProfile(data as PhiboPerfil);
+        return data as PhiboPerfil;
       }
     } catch (err) {
       console.warn('Erro ao carregar perfil do Supabase:', err);
     }
+    return null;
   };
 
   useEffect(() => {
@@ -87,7 +89,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim().toLowerCase(),
         password,
       });
 
@@ -95,11 +97,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error;
       }
 
+      let loadedProfile: PhiboPerfil | null = null;
       if (data.user) {
         setUser(data.user);
-        await fetchProfile(data.user.id);
+        loadedProfile = await fetchProfile(data.user.id);
+        if (!loadedProfile) {
+          const meta = data.user.user_metadata || {};
+          loadedProfile = {
+            id: data.user.id,
+            cliente_id: meta.cliente_id || 'e4190b32-62e4-4ae8-a8f1-6b8b8fcac49e',
+            full_name: meta.full_name || (data.user.email ? data.user.email.split('@')[0] : 'Usuário'),
+            email: data.user.email || email,
+            role: meta.role || 'seller',
+            nome_vendedor: meta.nome_vendedor || null,
+            ativo: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          setProfile(loadedProfile);
+        }
       }
-      return { success: true };
+      return { success: true, profile: loadedProfile };
     } catch (error: any) {
       return { success: false, error: error.message || 'Falha ao autenticar' };
     } finally {

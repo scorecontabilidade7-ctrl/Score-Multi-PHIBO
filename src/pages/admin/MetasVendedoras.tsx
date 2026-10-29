@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Target,
@@ -14,17 +14,27 @@ import {
   X,
   Loader2,
   ShieldAlert,
+  Key,
+  Lock,
+  Mail,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  UserCheck,
 } from 'lucide-react';
 import { useAdminConfig } from '../../hooks/useAdminConfig';
 import { useAuth } from '../../hooks/useAuth';
 import { processAndUploadAvatar } from '../../utils/imageUpload';
 import { AcompanhamentoSemanalMetas } from '../../components/metas/AcompanhamentoSemanalMetas';
+import { cadastrarAcessoVendedora, redefinirSenhaVendedora, buscarPerfisLoja } from '../../utils/sellerAuth';
+import { PhiboPerfil } from '../../integrations/supabase/types';
 
 export const MetasVendedoras: React.FC = () => {
   const navigate = useNavigate();
   const { profile, isAuthenticated, loading } = useAuth();
   const isSeller = profile?.role === 'seller';
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const clienteId = 'e4190b32-62e4-4ae8-a8f1-6b8b8fcac49e';
 
   const {
     vendedores,
@@ -34,6 +44,11 @@ export const MetasVendedoras: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'acompanhamento' | 'vendedores'>('acompanhamento');
   const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Perfis do Supabase Auth para cruzar com as vendedoras
+  const [perfisLoja, setPerfisLoja] = useState<PhiboPerfil[]>([]);
+  const [loadingPerfis, setLoadingPerfis] = useState(false);
 
   // Estados para cadastro de nova vendedora e upload de foto
   const [novoVendedorNome, setNovoVendedorNome] = useState('');
@@ -41,6 +56,35 @@ export const MetasVendedoras: React.FC = () => {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [tableUploadLoadingId, setTableUploadLoadingId] = useState<string | null>(null);
+
+  // Estados para credenciais de acesso no formulário de cadastro
+  const [habilitarCredenciais, setHabilitarCredenciais] = useState(false);
+  const [novoEmail, setNovoEmail] = useState('');
+  const [novaSenha, setNovaSenha] = useState('');
+  const [showNovaSenha, setShowNovaSenha] = useState(false);
+  const [isSubmittingNovo, setIsSubmittingNovo] = useState(false);
+
+  // Estados do Modal de Gestão/Troca de Senha
+  const [modalVendedor, setModalVendedor] = useState<{ nome: string; perfil?: PhiboPerfil | null } | null>(null);
+  const [modalEmail, setModalEmail] = useState('');
+  const [modalSenha, setModalSenha] = useState('');
+  const [showModalSenha, setShowModalSenha] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState('');
+
+  const carregarPerfis = async () => {
+    setLoadingPerfis(true);
+    try {
+      const perfis = await buscarPerfisLoja(clienteId);
+      setPerfisLoja(perfis);
+    } finally {
+      setLoadingPerfis(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarPerfis();
+  }, []);
 
   const handlePhotoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -72,14 +116,104 @@ export const MetasVendedoras: React.FC = () => {
     }
   };
 
-  const handleCriarVendedor = (e: React.FormEvent) => {
+  const handleCriarVendedor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!novoVendedorNome) return;
-    cadastrarVendedor(novoVendedorNome, novoVendedorFoto, 1.0);
-    setNovoVendedorNome('');
-    setNovoVendedorFoto('');
-    setSuccessMessage('Vendedora cadastrada com sucesso!');
-    setTimeout(() => setSuccessMessage(''), 3000);
+    setIsSubmittingNovo(true);
+    setErrorMessage('');
+
+    try {
+      // 1. Cadastra na configuração da loja
+      await cadastrarVendedor(novoVendedorNome, novoVendedorFoto, 1.0);
+
+      // 2. Se optou por criar credenciais de login
+      if (habilitarCredenciais) {
+        if (!novoEmail || !novaSenha) {
+          throw new Error('Informe o e-mail e a senha para gerar o login da vendedora.');
+        }
+        if (novaSenha.length < 6) {
+          throw new Error('A senha deve ter no mínimo 6 caracteres.');
+        }
+        await cadastrarAcessoVendedora({
+          nome: novoVendedorNome,
+          email: novoEmail,
+          senha: novaSenha,
+          clienteId,
+        });
+        await carregarPerfis();
+        setSuccessMessage(`Vendedora ${novoVendedorNome} cadastrada com login e senha ativos!`);
+      } else {
+        setSuccessMessage(`Vendedora ${novoVendedorNome} cadastrada com sucesso!`);
+      }
+
+      setNovoVendedorNome('');
+      setNovoVendedorFoto('');
+      setNovoEmail('');
+      setNovaSenha('');
+      setHabilitarCredenciais(false);
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Falha ao cadastrar vendedora ou credenciais.');
+    } finally {
+      setIsSubmittingNovo(false);
+    }
+  };
+
+  const abrirModalCredenciais = (nome: string) => {
+    const perfil = perfisLoja.find(
+      (p) =>
+        p.nome_vendedor?.trim().toLowerCase() === nome.trim().toLowerCase() ||
+        p.full_name?.trim().toLowerCase() === nome.trim().toLowerCase()
+    );
+    setModalVendedor({ nome, perfil });
+    setModalEmail(perfil?.email || '');
+    setModalSenha('');
+    setModalError('');
+    setShowModalSenha(false);
+  };
+
+  const handleSalvarModalCredenciais = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!modalVendedor) return;
+    setModalLoading(true);
+    setModalError('');
+
+    try {
+      if (modalVendedor.perfil) {
+        // Usuário já possui conta: altera a senha
+        if (!modalSenha || modalSenha.length < 6) {
+          throw new Error('A nova senha deve ter no mínimo 6 caracteres.');
+        }
+        const res = await redefinirSenhaVendedora(modalVendedor.perfil.id, modalSenha);
+        if (!res.success) {
+          throw new Error(res.error || 'Erro ao redefinir senha.');
+        }
+        setSuccessMessage(`Senha de acesso de ${modalVendedor.nome} redefinida com sucesso!`);
+      } else {
+        // Usuário novo: cria login do zero
+        if (!modalEmail || !modalSenha) {
+          throw new Error('Preencha o e-mail e a senha.');
+        }
+        if (modalSenha.length < 6) {
+          throw new Error('A senha deve ter no mínimo 6 caracteres.');
+        }
+        await cadastrarAcessoVendedora({
+          nome: modalVendedor.nome,
+          email: modalEmail,
+          senha: modalSenha,
+          clienteId,
+        });
+        setSuccessMessage(`Credenciais de acesso criadas com sucesso para ${modalVendedor.nome}!`);
+      }
+
+      await carregarPerfis();
+      setModalVendedor(null);
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (err: any) {
+      setModalError(err.message || 'Erro ao salvar credenciais.');
+    } finally {
+      setModalLoading(false);
+    }
   };
 
   // 1. Estado de carregamento
@@ -184,15 +318,22 @@ export const MetasVendedoras: React.FC = () => {
             }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span>Vendedoras & Fotos</span>
+            <span>Vendedoras, Fotos & Logins</span>
           </button>
         </div>
       </div>
 
       {successMessage && (
-        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2 animate-fade-in">
+        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-2 animate-fade-in">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
           <span>{successMessage}</span>
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-bold flex items-center gap-2 animate-fade-in">
+          <ShieldAlert className="w-4 h-4 shrink-0" />
+          <span>{errorMessage}</span>
         </div>
       )}
 
@@ -201,31 +342,31 @@ export const MetasVendedoras: React.FC = () => {
         <AcompanhamentoSemanalMetas />
       )}
 
-      {/* ABA 1: VENDEDORAS & FOTOS */}
+      {/* ABA 1: VENDEDORAS, FOTOS & LOGINS */}
       {activeTab === 'vendedores' && (
         <div className="space-y-6">
-          {/* Formulário de Cadastro com Upload Direto de Imagem */}
-          <div className="p-6 rounded-2xl border border-border bg-card shadow-xs space-y-4">
+          {/* Formulário de Cadastro com Upload de Foto e Credenciais de Acesso */}
+          <div className="p-6 rounded-2xl border border-border bg-card shadow-xs space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="text-base font-bold text-foreground flex items-center gap-2">
                   <Plus className="w-4 h-4 text-rose-500" />
-                  Cadastrar Nova Vendedora & Foto
+                  Cadastrar Nova Vendedora & Credenciais de Acesso
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Alimente com fotos reais (PNG, JPG, prints da tela) ou informe a URL de perfil
+                  Cadastre o nome do ERP PHIBO, foto de perfil e configure o e-mail/senha para ela acessar seu próprio painel 360º
                 </p>
               </div>
               <div className="text-[11px] font-semibold text-rose-500 bg-rose-500/10 px-2.5 py-1 rounded-lg border border-rose-500/20 inline-flex items-center gap-1.5 self-start sm:self-auto">
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Upload de Imagem Direta & Print</span>
+                <span>Upload de Foto & Acesso Individual</span>
               </div>
             </div>
 
             <form onSubmit={handleCriarVendedor} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                 {/* Nome Oficial */}
-                <div className="md:col-span-5 space-y-1.5">
+                <div className="md:col-span-4 space-y-1.5">
                   <label className="text-xs font-semibold text-foreground">
                     Nome Oficial no ERP PHIBO <span className="text-rose-500">*</span>
                   </label>
@@ -233,7 +374,7 @@ export const MetasVendedoras: React.FC = () => {
                     type="text"
                     value={novoVendedorNome}
                     onChange={(e) => setNovoVendedorNome(e.target.value)}
-                    placeholder="Ex: Fernanda Lima"
+                    placeholder="Ex: Mariana Costa"
                     className="w-full text-xs bg-secondary text-foreground px-3.5 py-2.5 rounded-xl border border-border focus:ring-1 focus:ring-rose-500 shadow-2xs"
                     required
                   />
@@ -322,30 +463,108 @@ export const MetasVendedoras: React.FC = () => {
                   )}
                 </div>
 
-                {/* Botão de Salvar */}
-                <div className="md:col-span-2">
-                  <button
-                    type="submit"
-                    className="w-full inline-flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/25 cursor-pointer transition-all h-[38px]"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Salvar</span>
-                  </button>
+                {/* Toggle de Credenciais */}
+                <div className="md:col-span-3 pt-6">
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl border border-border bg-secondary/40 hover:bg-secondary cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={habilitarCredenciais}
+                      onChange={(e) => setHabilitarCredenciais(e.target.checked)}
+                      className="w-4 h-4 rounded text-rose-500 accent-rose-500 cursor-pointer"
+                    />
+                    <div className="text-left leading-tight">
+                      <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                        <Key className="w-3 h-3 text-rose-500" />
+                        Gerar Login de Acesso
+                      </span>
+                      <p className="text-[10px] text-muted-foreground">E-mail e senha individual</p>
+                    </div>
+                  </label>
                 </div>
+              </div>
+
+              {/* Campos condicionais de E-mail e Senha para Login */}
+              {habilitarCredenciais && (
+                <div className="p-4 rounded-xl bg-secondary/30 border border-rose-500/20 grid grid-cols-1 md:grid-cols-12 gap-3 items-center animate-fade-in">
+                  <div className="md:col-span-6 space-y-1">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-rose-500" />
+                      E-mail de Acesso da Vendedora <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={novoEmail}
+                      onChange={(e) => setNovoEmail(e.target.value)}
+                      placeholder="mariana@blushfit.com.br"
+                      className="w-full text-xs bg-background text-foreground px-3 py-2 rounded-xl border border-border focus:ring-1 focus:ring-rose-500"
+                      required={habilitarCredenciais}
+                    />
+                  </div>
+
+                  <div className="md:col-span-6 space-y-1">
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5 text-rose-500" />
+                      Senha de Acesso (mínimo 6 dígitos) <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showNovaSenha ? 'text' : 'password'}
+                        value={novaSenha}
+                        onChange={(e) => setNovaSenha(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full text-xs bg-background text-foreground px-3 py-2 pr-9 rounded-xl border border-border focus:ring-1 focus:ring-rose-500"
+                        required={habilitarCredenciais}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNovaSenha(!showNovaSenha)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        {showNovaSenha ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Botão de Salvar */}
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isSubmittingNovo}
+                  className="inline-flex items-center justify-center gap-2 py-2 px-5 rounded-xl text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/25 cursor-pointer transition-all disabled:opacity-50"
+                >
+                  {isSubmittingNovo ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Salvando Cadastro...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Salvar Vendedora {habilitarCredenciais ? '& Criar Acesso' : ''}</span>
+                    </>
+                  )}
+                </button>
               </div>
             </form>
           </div>
 
-          {/* Tabela de Vendedoras */}
+          {/* Tabela de Vendedoras com Gestão de Credenciais */}
           <div className="p-6 rounded-2xl border border-border bg-card shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h3 className="text-base font-bold text-foreground">Vendedoras Cadastradas no Sistema</h3>
-                <p className="text-xs text-muted-foreground">Passe o mouse na foto para trocar a imagem da vendedora diretamente</p>
+                <h3 className="text-base font-bold text-foreground">Vendedoras Cadastradas & Status de Acesso</h3>
+                <p className="text-xs text-muted-foreground">
+                  Passe o mouse na foto para trocar a imagem ou clique no botão de chave para configurar/redefinir o login
+                </p>
               </div>
-              <span className="text-xs font-semibold bg-secondary px-2.5 py-1 rounded-lg text-muted-foreground border border-border">
-                Total: <strong>{vendedores.length}</strong>
-              </span>
+              <div className="flex items-center gap-2">
+                {loadingPerfis && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
+                <span className="text-xs font-semibold bg-secondary px-2.5 py-1 rounded-lg text-muted-foreground border border-border">
+                  Total: <strong>{vendedores.length}</strong>
+                </span>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -354,88 +573,251 @@ export const MetasVendedoras: React.FC = () => {
                   <tr className="border-b border-border text-muted-foreground font-semibold">
                     <th className="py-2.5 px-3">Foto (Upload Direto)</th>
                     <th className="py-2.5 px-3">Nome Oficial (PHIBO)</th>
+                    <th className="py-2.5 px-3">Credenciais de Acesso (Login)</th>
                     <th className="py-2.5 px-3">Peso na Meta</th>
                     <th className="py-2.5 px-3">Status de Rateio</th>
-                    <th className="py-2.5 px-3 text-right">Ação</th>
+                    <th className="py-2.5 px-3 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {vendedores.map((v) => (
-                    <tr key={v.id} className="hover:bg-secondary/40 transition-colors">
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-2">
-                          <div className="relative group shrink-0">
-                            {tableUploadLoadingId === v.id ? (
-                              <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                                <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
-                              </div>
-                            ) : v.url_foto ? (
-                              <img
-                                src={v.url_foto}
-                                alt={v.nome_vendedor}
-                                className="w-10 h-10 rounded-full object-cover ring-2 ring-rose-500/30"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-full bg-secondary text-muted-foreground flex items-center justify-center font-bold text-xs ring-1 ring-border">
-                                {v.nome_vendedor.slice(0, 2).toUpperCase()}
-                              </div>
-                            )}
+                  {vendedores.map((v) => {
+                    const perfil = perfisLoja.find(
+                      (p) =>
+                        p.nome_vendedor?.trim().toLowerCase() === v.nome_vendedor.trim().toLowerCase() ||
+                        p.full_name?.trim().toLowerCase() === v.nome_vendedor.trim().toLowerCase()
+                    );
 
-                            {/* Overlay de Câmera para troca rápida */}
+                    return (
+                      <tr key={v.id} className="hover:bg-secondary/40 transition-colors">
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-2">
+                            <div className="relative group shrink-0">
+                              {tableUploadLoadingId === v.id ? (
+                                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                                  <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                </div>
+                              ) : v.url_foto ? (
+                                <img
+                                  src={v.url_foto}
+                                  alt={v.nome_vendedor}
+                                  className="w-10 h-10 rounded-full object-cover ring-2 ring-rose-500/30"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-full bg-secondary text-muted-foreground flex items-center justify-center font-bold text-xs ring-1 ring-border">
+                                  {v.nome_vendedor.slice(0, 2).toUpperCase()}
+                                </div>
+                              )}
+
+                              {/* Overlay de Câmera para troca rápida */}
+                              <label
+                                htmlFor={`file-upload-${v.id}`}
+                                className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white shadow-xs"
+                                title="Trocar Foto"
+                              >
+                                <Camera className="w-4 h-4" />
+                              </label>
+                              <input
+                                type="file"
+                                id={`file-upload-${v.id}`}
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleTablePhotoChange(v.id, v.nome_vendedor, file);
+                                }}
+                              />
+                            </div>
+
                             <label
                               htmlFor={`file-upload-${v.id}`}
-                              className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white shadow-xs"
+                              className="inline-flex sm:hidden p-1 rounded-md bg-secondary text-muted-foreground hover:text-rose-500 cursor-pointer"
                               title="Trocar Foto"
                             >
-                              <Camera className="w-4 h-4" />
+                              <Camera className="w-3.5 h-3.5" />
                             </label>
-                            <input
-                              type="file"
-                              id={`file-upload-${v.id}`}
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleTablePhotoChange(v.id, v.nome_vendedor, file);
-                              }}
-                            />
                           </div>
+                        </td>
 
-                          <label
-                            htmlFor={`file-upload-${v.id}`}
-                            className="inline-flex sm:hidden p-1 rounded-md bg-secondary text-muted-foreground hover:text-rose-500 cursor-pointer"
-                            title="Trocar Foto"
+                        <td className="py-3 px-3">
+                          <p className="font-bold text-foreground">{v.nome_vendedor}</p>
+                          <span className="text-[10px] text-muted-foreground">ID: {v.id.slice(0, 8)}</span>
+                        </td>
+
+                        {/* Status e E-mail de Login */}
+                        <td className="py-3 px-3">
+                          {perfil ? (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                <ShieldCheck className="w-3 h-3" />
+                                Login Ativo
+                              </span>
+                              <p className="text-[11px] font-medium text-foreground truncate max-w-[180px]">
+                                {perfil.email}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-secondary text-muted-foreground border border-border">
+                                Sem Login Criado
+                              </span>
+                              <p className="text-[10px] text-muted-foreground">Somente registro ERP</p>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-3 px-3 text-muted-foreground">{v.peso_meta.toFixed(1)}x (integral)</td>
+
+                        <td className="py-3 px-3">
+                          <span
+                            className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              v.ativo
+                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-secondary text-muted-foreground'
+                            }`}
                           >
-                            <Camera className="w-3.5 h-3.5" />
-                          </label>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 font-bold text-foreground">{v.nome_vendedor}</td>
-                      <td className="py-3 px-3 text-muted-foreground">{v.peso_meta.toFixed(1)}x (integral)</td>
-                      <td className="py-3 px-3">
-                        <span
-                          className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            v.ativo
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-secondary text-muted-foreground'
-                          }`}
-                        >
-                          {v.ativo ? 'Ativa no Rateio' : 'Inativa'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <button
-                          onClick={() => atualizarVendedor(v.id, { ativo: !v.ativo })}
-                          className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-secondary hover:bg-border transition-colors cursor-pointer"
-                        >
-                          {v.ativo ? 'Desativar' : 'Ativar'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                            {v.ativo ? 'Ativa no Rateio' : 'Inativa'}
+                          </span>
+                        </td>
+
+                        <td className="py-3 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Botão de Gestão de Credenciais / Senha */}
+                            <button
+                              onClick={() => abrirModalCredenciais(v.nome_vendedor)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 transition-colors cursor-pointer"
+                              title={perfil ? 'Redefinir Senha de Acesso' : 'Criar Acesso de Login'}
+                            >
+                              <Key className="w-3 h-3" />
+                              <span>{perfil ? 'Trocar Senha' : 'Criar Acesso'}</span>
+                            </button>
+
+                            {/* Botão de Ativação no Rateio */}
+                            <button
+                              onClick={() => atualizarVendedor(v.id, { ativo: !v.ativo })}
+                              className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-secondary hover:bg-border transition-colors cursor-pointer"
+                            >
+                              {v.ativo ? 'Desativar' : 'Ativar'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE GESTÃO DE CREDENCIAIS (CRIAR OU REDEFINIR SENHA) */}
+      {modalVendedor && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4 animate-scale-in">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                  <Key className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">
+                    {modalVendedor.perfil ? 'Redefinir Senha de Acesso' : 'Criar Login de Acesso'}
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground">Vendedora: <strong>{modalVendedor.nome}</strong></p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalVendedor(null)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {modalError && (
+              <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span>{modalError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSalvarModalCredenciais} className="space-y-4">
+              {/* E-mail */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-rose-500" />
+                  E-mail de Acesso Corporativo
+                </label>
+                <input
+                  type="email"
+                  value={modalEmail}
+                  onChange={(e) => setModalEmail(e.target.value)}
+                  disabled={!!modalVendedor.perfil}
+                  placeholder={`exemplo@blushfit.com.br`}
+                  className={`w-full text-xs bg-secondary text-foreground px-3 py-2.5 rounded-xl border border-border focus:ring-1 focus:ring-rose-500 ${
+                    modalVendedor.perfil ? 'opacity-70 cursor-not-allowed' : ''
+                  }`}
+                  required
+                />
+                {modalVendedor.perfil && (
+                  <p className="text-[10px] text-muted-foreground">O e-mail já está registrado na base de dados.</p>
+                )}
+              </div>
+
+              {/* Senha */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-rose-500" />
+                  {modalVendedor.perfil ? 'Nova Senha de Acesso' : 'Senha Inicial'}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showModalSenha ? 'text' : 'password'}
+                    value={modalSenha}
+                    onChange={(e) => setModalSenha(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full text-xs bg-secondary text-foreground px-3 py-2.5 pr-9 rounded-xl border border-border focus:ring-1 focus:ring-rose-500"
+                    required
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowModalSenha(!showModalSenha)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  >
+                    {showModalSenha ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setModalVendedor(null)}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold bg-secondary hover:bg-border text-foreground transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={modalLoading}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/25 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {modalLoading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Salvando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span>{modalVendedor.perfil ? 'Atualizar Senha' : 'Criar Acesso'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

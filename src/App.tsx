@@ -14,7 +14,7 @@ export default function App() {
   const [isDark, setIsDark] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, profile, isAuthenticated, signOut } = useAuth();
+  const { user, profile, isAuthenticated, loading, signOut } = useAuth();
 
   const toggleTheme = () => {
     setIsDark(!isDark);
@@ -43,17 +43,41 @@ export default function App() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className={`min-h-screen bg-background text-foreground flex items-center justify-center ${isDark ? 'dark' : ''}`}>
+        <div className="flex flex-col items-center gap-3 animate-fade-in">
+          <div className="w-8 h-8 border-3 border-rose-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-semibold text-muted-foreground">Carregando autenticação...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen bg-background text-foreground transition-colors duration-200 ${isDark ? 'dark' : ''}`}>
       {/* Top Header Global (oculto na tela de login) */}
       <Routes>
         <Route
           path="/login"
-          element={<Login />}
+          element={
+            isAuthenticated ? (
+              profile?.role === 'seller' ? (
+                <Navigate to={`/vendedor/${encodeURIComponent(profile?.nome_vendedor || 'Juliana')}`} replace />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            ) : (
+              <Login />
+            )
+          }
         />
         <Route
           path="*"
           element={
+            !isAuthenticated ? (
+              <Navigate to="/login" replace />
+            ) : (
             <>
               <header className="sticky top-0 z-50 border-b border-border bg-card/85 backdrop-blur-md px-6 py-2.5 flex items-center justify-between shadow-xs">
                 {/* Logo & Marca */}
@@ -248,6 +272,7 @@ export default function App() {
                 </Routes>
               </main>
             </>
+            )
           }
         />
       </Routes>

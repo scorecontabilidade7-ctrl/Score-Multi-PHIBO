@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowRight, UserCheck, AlertCircle, BarChart3 } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowRight, AlertCircle, BarChart3, Loader2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn, loginDemo, loading } = useAuth();
+  const { signIn, loading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,24 +17,19 @@ export const Login: React.FC = () => {
     setErrorMessage('');
 
     if (!email || !password) {
-      setErrorMessage('Por favor, preencha todos os campos.');
+      setErrorMessage('Por favor, informe seu e-mail corporativo e sua senha.');
       return;
     }
 
-    const result = await signIn(email, password);
+    const result = await signIn(email.trim(), password);
     if (result.success) {
-      navigate('/');
+      if (result.profile?.role === 'seller' && result.profile.nome_vendedor) {
+        navigate(`/vendedor/${encodeURIComponent(result.profile.nome_vendedor)}`);
+      } else {
+        navigate('/');
+      }
     } else {
-      setErrorMessage(result.error || 'Credenciais inválidas.');
-    }
-  };
-
-  const handleDemoLogin = (role: 'super_admin' | 'admin' | 'seller', name: string, userEmail: string, nomeVendedor?: string) => {
-    loginDemo(role, name, userEmail, nomeVendedor);
-    if (role === 'seller' && nomeVendedor) {
-      navigate(`/vendedor/${encodeURIComponent(nomeVendedor)}`);
-    } else {
-      navigate('/');
+      setErrorMessage(result.error || 'E-mail ou senha incorretos.');
     }
   };
 
@@ -62,7 +57,7 @@ export const Login: React.FC = () => {
         {/* Card do Formulário */}
         <div className="p-6 sm:p-8 rounded-2xl border border-border bg-card/90 backdrop-blur-md shadow-lg space-y-5">
           {errorMessage && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium animate-fade-in">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{errorMessage}</span>
             </div>
@@ -77,9 +72,10 @@ export const Login: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu.email@empresa.com.br"
-                  className="w-full text-xs bg-secondary text-foreground pl-9 pr-3 py-2.5 rounded-xl border border-border focus:outline-hidden focus:ring-2 focus:ring-rose-500 transition-all"
+                  placeholder="seu.email@score.com.br"
+                  className="w-full text-xs bg-secondary text-foreground pl-9 pr-3 py-2.5 rounded-xl border border-border focus:outline-hidden focus:ring-2 focus:ring-rose-500 transition-all shadow-2xs"
                   required
+                  autoFocus
                 />
               </div>
             </div>
@@ -93,13 +89,14 @@ export const Login: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full text-xs bg-secondary text-foreground pl-9 pr-9 py-2.5 rounded-xl border border-border focus:outline-hidden focus:ring-2 focus:ring-rose-500 transition-all"
+                  className="w-full text-xs bg-secondary text-foreground pl-9 pr-9 py-2.5 rounded-xl border border-border focus:outline-hidden focus:ring-2 focus:ring-rose-500 transition-all shadow-2xs"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                  title={showPassword ? 'Ocultar senha' : 'Exibir senha'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -109,62 +106,32 @@ export const Login: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/25 transition-all cursor-pointer disabled:opacity-50"
+              className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-rose-500 hover:bg-rose-600 text-white shadow-md shadow-rose-500/25 transition-all cursor-pointer disabled:opacity-50 mt-2"
             >
-              <span>{loading ? 'Autenticando...' : 'Entrar na Plataforma'}</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              {loading ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Autenticando...</span>
+                </>
+              ) : (
+                <>
+                  <span>Entrar na Plataforma</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </>
+              )}
             </button>
           </form>
-
-          {/* Divisor */}
-          <div className="relative flex items-center justify-center">
-            <div className="border-t border-border w-full" />
-            <span className="bg-card px-2 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider shrink-0">
-              Acesso Rápido de Teste
-            </span>
-          </div>
-
-          {/* Botões de Acesso Demo Rápido */}
-          <div className="space-y-2">
-            <button
-              onClick={() => handleDemoLogin('super_admin', 'Diretoria Executiva', 'diretoria@blushfit.com.br')}
-              className="w-full flex items-center justify-between p-2.5 rounded-xl border border-border hover:border-rose-500/40 bg-secondary/50 hover:bg-secondary text-xs font-semibold transition-all cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-rose-500" />
-                <span>Entrar como <strong>Diretoria (Super Admin)</strong></span>
-              </div>
-              <span className="text-[10px] text-muted-foreground">Todas as Lojas</span>
-            </button>
-
-            <button
-              onClick={() => handleDemoLogin('admin', 'Gerente BlushFit', 'gerente@blushfit.com.br')}
-              className="w-full flex items-center justify-between p-2.5 rounded-xl border border-border hover:border-rose-500/40 bg-secondary/50 hover:bg-secondary text-xs font-semibold transition-all cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-emerald-500" />
-                <span>Entrar como <strong>Gerente de Loja</strong></span>
-              </div>
-              <span className="text-[10px] text-muted-foreground">BlushFit</span>
-            </button>
-
-            <button
-              onClick={() => handleDemoLogin('seller', 'Juliana Silva', 'juliana.silva@blushfit.com.br', 'Juliana')}
-              className="w-full flex items-center justify-between p-2.5 rounded-xl border border-border hover:border-rose-500/40 bg-secondary/50 hover:bg-secondary text-xs font-semibold transition-all cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-amber-500" />
-                <span>Entrar como <strong>Vendedora (Juliana Silva)</strong></span>
-              </div>
-              <span className="text-[10px] text-muted-foreground">Perfil 360º</span>
-            </button>
-          </div>
         </div>
 
-        {/* Rodapé de Governança */}
-        <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground text-center">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-          <span>Sessão multi-usuário simultânea ativa (sem desconexão automática)</span>
+        {/* Rodapé de Governança e Segurança */}
+        <div className="flex flex-col items-center justify-center gap-1.5 text-[11px] text-muted-foreground text-center">
+          <div className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Autenticação Corporativa Segura & Sessão Ativa</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground/80">
+            Score Contabilidade & Gestão Comercial PHIBO
+          </p>
         </div>
       </div>
     </div>
